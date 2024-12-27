@@ -1,0 +1,176 @@
+{% extends 'blog/base.html' %}
+
+{% block title %}VPD 설정 - 스마트팜 시스템{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4 display-3 fw-bold text-center">VPD 설정 및 모니터링</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4 shadow-lg">
+            <div class="card-header bg-primary text-white py-3">
+                <h3 class="card-title mb-0">VPD 범위 설정</h3>
+            </div>
+            <div class="card-body p-4">
+                <div class="mb-4">
+                    <label for="min_vpd" class="form-label h4">최소 VPD (kPa)</label>
+                    <input type="number" class="form-control form-control-lg fs-2" id="min_vpd" step="0.1" value="{{ vpd_settings.min_vpd }}">
+                </div>
+                <div class="mb-4">
+                    <label for="max_vpd" class="form-label h4">최대 VPD (kPa)</label>
+                    <input type="number" class="form-control form-control-lg fs-2" id="max_vpd" step="0.1" value="{{ vpd_settings.max_vpd }}">
+                </div>
+                <button class="btn btn-primary btn-lg w-100 py-3 fs-3" onclick="updateSettings()">설정 저장</button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card mb-4 shadow-lg">
+            <div class="card-header bg-primary text-white py-3">
+                <h3 class="card-title mb-0">현재 상태</h3>
+            </div>
+            <div class="card-body p-4">
+                <div class="mb-5 text-center">
+                    <h4 class="text-muted mb-3">현재 VPD</h4>
+                    <p class="display-1 fw-bold text-primary mb-0" id="current-vpd">{{ data.vpd }} kPa</p>
+                </div>
+
+                <div class="row mb-4 g-4">
+                    <div class="col-md-4">
+                        <div class="device-status">
+                            <h4 class="text-muted mb-3">유동팬</h4>
+                            <span id="motor-state" class="badge rounded-pill fs-6 {% if data.motor_state == 'RUNNING' %}bg-success{% else %}bg-secondary{% endif %}">
+                                {{ data.motor_state }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="device-status">
+                            <h4 class="text-muted mb-3">측창</h4>
+                            <span id="servo-state" class="badge rounded-pill fs-6 {% if data.servo_state == 'MAX' %}bg-success{% else %}bg-secondary{% endif %}">
+                                {% if data.servo_state == 'MAX' %}OPEN{% elif data.servo_state == 'MID' %}CLOSE{% else %}{{ data.servo_state }}{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="device-status">
+                            <h4 class="text-muted mb-3">포그기</h4>
+                            <span id="fog-state" class="badge rounded-pill fs-6 {% if data.led_state == 'ON' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                {{ data.led_state }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="status-message" class="mt-4"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.device-status {
+    text-align: center;
+    padding: 1.5rem;
+    border-radius: 12px;
+    background-color: #f8f9fa;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.badge {
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+.badge.bg-success {
+    background-color: #198754 !important;
+}
+
+.badge.bg-warning {
+    background-color: #ffc107 !important;
+    color: #000;
+}
+
+.badge.bg-secondary {
+    background-color: #6c757d !important;
+}
+
+.alert {
+    font-size: 1.5rem;
+    font-weight: 500;
+    padding: 1rem 1.5rem;
+}
+</style>
+
+{% block extra_js %}
+<script>
+    function updateSettings() {
+        const minVpd = document.getElementById('min_vpd').value;
+        const maxVpd = document.getElementById('max_vpd').value;
+
+        if (parseFloat(minVpd) >= parseFloat(maxVpd)) {
+            alert('최소 VPD 값은 최대 VPD 값보다 작아야 합니다.');
+            return;
+        }
+
+        fetch('{% url "blog:update_vpd_settings" %}', {
+            method: 'POST',
+            body: JSON.stringify({
+                min_vpd: minVpd,
+                max_vpd: maxVpd
+            }),
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('설정이 성공적으로 저장되었습니다.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('설정 저장 중 오류가 발생했습니다.');
+        });
+    }
+
+    function updateStatus() {
+        fetch('{% url "blog:check_vpd_status" %}')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('current-vpd').textContent = `${data.vpd} kPa`;
+
+                const motorState = document.getElementById('motor-state');
+                motorState.textContent = data.motor_state;
+                motorState.className = `badge rounded-pill fs-6 ${data.motor_state === 'RUNNING' ? 'bg-success' : 'bg-secondary'}`;
+
+                const servoState = document.getElementById('servo-state');
+                servoState.textContent = data.servo_state === 'MAX' ? 'OPEN' : 'CLOSE';
+                servoState.className = `badge rounded-pill fs-6 ${data.servo_state === 'MAX' ? 'bg-success' : 'bg-secondary'}`;
+
+                const fogState = document.getElementById('fog-state');
+                fogState.textContent = data.led_state;
+                fogState.className = `badge rounded-pill fs-6 ${data.led_state === 'ON' ? 'bg-warning' : 'bg-secondary'}`;
+
+                const messageElement = document.getElementById('status-message');
+                if (data.vpd < data.min_vpd) {
+                    messageElement.innerHTML = '<div class="alert alert-warning">VPD가 너무 낮습니다.</div>';
+                } else if (data.vpd > data.max_vpd) {
+                    messageElement.innerHTML = '<div class="alert alert-warning">VPD가 너무 높습니다.</div>';
+                } else {
+                    messageElement.innerHTML = '<div class="alert alert-success">VPD가 적정 범위 내에 있습니다.</div>';
+                }
+            });
+    }
+
+    updateStatus();
+    setInterval(updateStatus, 2000);
+</script>
+{% endblock %}
+{% endblock %}

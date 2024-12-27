@@ -1,0 +1,173 @@
+{% extends 'blog/base.html' %}
+
+{% block title %}센서 데이터 - 스마트팜 시스템{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">실시간 센서 데이터 모니터링</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body text-center">
+                <h5 class="card-title">온도</h5>
+                <h2 class="card-text" id="temperature">{{ data.temperature }}°C</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body text-center">
+                <h5 class="card-title">습도</h5>
+                <h2 class="card-text" id="humidity">{{ data.humidity }}%</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body text-center">
+                <h5 class="card-title">VPD</h5>
+                <h2 class="card-text" id="vpd">{{ data.vpd }} kPa</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body" style="height: 500px;">
+                <canvas id="sensorChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Chart.js 설정 및 데이터 업데이트 코드
+    const ctx = document.getElementById('sensorChart').getContext('2d');
+    const timeLabels = [];
+    const tempData = [];
+    const humidityData = [];
+    const vpdData = [];
+
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: timeLabels,
+            datasets: [
+                {
+                    label: '온도 (°C)',
+                    data: tempData,
+                    borderColor: '#FF6384',
+                    tension: 0.4,
+                    yAxisID: 'y-temperature'
+                },
+                {
+                    label: '습도 (%)',
+                    data: humidityData,
+                    borderColor: '#36A2EB',
+                    tension: 0.4,
+                    yAxisID: 'y-humidity'
+                },
+                {
+                    label: 'VPD (kPa)',
+                    data: vpdData,
+                    borderColor: '#4BC0C0',
+                    tension: 0.4,
+                    yAxisID: 'y-vpd'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                'y-temperature': {
+                    type: 'linear',
+                    position: 'left',
+                    beginAtZero: true,
+                    suggestedMax: 40,
+                    ticks: {
+                        stepSize: 5
+                    },
+                    title: {
+                        display: true,
+                        text: '온도 (°C)'
+                    }
+                },
+                'y-humidity': {
+                    type: 'linear',
+                    position: 'right',
+                    beginAtZero: true,
+                    suggestedMax: 100,
+                    ticks: {
+                        stepSize: 10
+                    },
+                    title: {
+                        display: true,
+                        text: '습도 (%)'
+                    }
+                },
+                'y-vpd': {
+                    type: 'linear',
+                    position: 'right',
+                    beginAtZero: true,
+                    suggestedMax: 5,
+                    ticks: {
+                        stepSize: 0.5
+                    },
+                    title: {
+                        display: true,
+                        text: 'VPD (kPa)'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                },
+                x: {
+                    grid: {
+                        display: true,
+                        drawBorder: true,
+                    }
+                }
+            }
+        }
+    });
+
+    function updateData() {
+        fetch('{% url "blog:get_sensor_data_api" %}')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('temperature').textContent = `${data.temperature}°C`;
+                document.getElementById('humidity').textContent = `${data.humidity}%`;
+                document.getElementById('vpd').textContent = `${data.vpd} kPa`;
+
+                const currentTime = new Date().toLocaleTimeString();
+
+                if (timeLabels.length > 30) {
+                    timeLabels.shift();
+                    tempData.shift();
+                    humidityData.shift();
+                    vpdData.shift();
+                }
+
+                timeLabels.push(currentTime);
+                tempData.push(data.temperature);
+                humidityData.push(data.humidity);
+                vpdData.push(data.vpd);
+
+                chart.update();
+            });
+    }
+
+    updateData();
+    setInterval(updateData, 2000);
+</script>
+{% endblock %}
+{% endblock %}
