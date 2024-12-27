@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+  web:
+    build: .
+    command: gunicorn final_prj.wsgi:application --bind 0.0.0.0:17013
+    volumes:
+      - ./:/usr/src/app/
+    ports:
+      - 17013:17013
